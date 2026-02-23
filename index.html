@@ -174,6 +174,31 @@
 			<button id="btnUpdate" style="background:#27ae60;">ZASTOSUJ ZMIANY</button>
 			<button id="btnDelete" style="background:#c0392b;">USUŃ (Del)</button>
 		</div>
+		<div id="imageEditPanel" style="display:none; margin-top:10px; border-top:1px solid #555; padding-top:10px;">
+			<p style="font-size:12px; color:#aaa;">Edytuj obraz:</p>
+
+			<label>X [cm]</label>
+			<input type="number" id="imgX">
+
+			<label>Y [cm]</label>
+			<input type="number" id="imgY">
+
+			<label>Szerokość [cm]</label>
+			<input type="number" id="imgW">
+
+			<label>Wysokość [cm]</label>
+			<input type="number" id="imgH">
+
+			<label>Obrót [°]</label>
+			<input type="number" id="imgRot">
+
+			<div style="display:flex; gap:5px;">
+				<button id="btnFlipX">Odbicie X</button>
+				<button id="btnFlipY">Odbicie Y</button>
+			</div>
+
+			<button id="btnImgUpdate" style="background:#27ae60;">ZASTOSUJ</button>
+		</div>
 
 	</div>
 	<!-- ✅ DODAJ: Sekcja zestawienia długości -->
@@ -230,6 +255,7 @@
 	let isRotatingImage = false;
     const zoomRange = document.getElementById('zoomRange');
     const zoomVal = document.getElementById('zoomVal');
+	const imageEditPanel = document.getElementById('imageEditPanel');
 	
 	let inputBuffer = ""; // Bufor dla wpisywanej długości
     const inputOverlay = document.getElementById('input-overlay');
@@ -348,7 +374,30 @@
             return dist < (el.t / 2 + 5);
         });
     }
-	
+	document.getElementById('btnImgUpdate').onclick = () => {
+		if (!selectedImage) return;
+
+		selectedImage.x = parseFloat(document.getElementById('imgX').value);
+		selectedImage.y = parseFloat(document.getElementById('imgY').value);
+		selectedImage.width = parseFloat(document.getElementById('imgW').value);
+		selectedImage.height = parseFloat(document.getElementById('imgH').value);
+
+		const deg = parseFloat(document.getElementById('imgRot').value);
+		selectedImage.rotation = deg * Math.PI / 180;
+
+		render();
+	};
+	document.getElementById('btnFlipX').onclick = () => {
+		if (!selectedImage) return;
+		selectedImage.flipX *= -1;
+		render();
+	};
+
+	document.getElementById('btnFlipY').onclick = () => {
+		if (!selectedImage) return;
+		selectedImage.flipY *= -1;
+		render();
+	};
 	
 	function getMousePos(e) {
 			const rect = canvas.getBoundingClientRect();
@@ -510,6 +559,13 @@
 				}
 
 				selectedImage = foundImage;
+				imageEditPanel.style.display = 'block';
+
+				document.getElementById('imgX').value = foundImage.x;
+				document.getElementById('imgY').value = foundImage.y;
+				document.getElementById('imgW').value = Math.round(foundImage.width);
+				document.getElementById('imgH').value = Math.round(foundImage.height);
+				document.getElementById('imgRot').value = Math.round(foundImage.rotation * 180 / Math.PI);
 				selectedElement = null;
 				isDraggingImage = true;
 				imageDragOffset.x = pos.x - foundImage.x;
@@ -538,6 +594,7 @@
                 originalElPos = { x1: found.x1, y1: found.y1, x2: found.x2, y2: found.y2 };
             } else {
                 selectedElement = null;
+				selectedImage = null;
                 editPanel.style.display = 'none';
             }
             render();
@@ -694,8 +751,17 @@
 		}
 		// ✅ Resize
 		if (isResizingImage && selectedImage) {
-			selectedImage.width = Math.max(20, mousePos.x - selectedImage.x);
-			selectedImage.height = Math.max(20, mousePos.y - selectedImage.y);
+
+			let newW = Math.max(20, mousePos.x - selectedImage.x);
+			let newH = Math.max(20, mousePos.y - selectedImage.y);
+
+			if (isShiftPressed) {
+				const ratio = selectedImage.img.width / selectedImage.img.height;
+				newH = newW / ratio;
+			}
+
+			selectedImage.width = newW;
+			selectedImage.height = newH;
 		}
 
 		// ✅ Rotacja
@@ -704,6 +770,14 @@
 			const cy = selectedImage.y + selectedImage.height / 2;
 			const angle = Math.atan2(mousePos.y - cy, mousePos.x - cx);
 			selectedImage.rotation = angle;
+		}
+		if (selectedImage && imageEditPanel.style.display === 'block') {
+			document.getElementById('imgX').value = Math.round(selectedImage.x);
+			document.getElementById('imgY').value = Math.round(selectedImage.y);
+			document.getElementById('imgW').value = Math.round(selectedImage.width);
+			document.getElementById('imgH').value = Math.round(selectedImage.height);
+			document.getElementById('imgRot').value =
+				Math.round(selectedImage.rotation * 180 / Math.PI);
 		}
 		updateStatus();
 		// ✅ aktualizacja punktu startowego z miarki
@@ -909,7 +983,7 @@
 
     // Blokada menu i obsługa plików (jak wcześniej)
     canvas.oncontextmenu = (e) => e.preventDefault();
-    document.getElementById('btnClear').onclick = () => { if(confirm("Wyczyścić?")) { elements = []; isDrawing = false; render(); } };
+    document.getElementById('btnClear').onclick = () => { if(confirm("Wyczyścić?")) { images = []; elements = []; isDrawing = false; render(); } };
 	document.getElementById('btnSave').onclick = () => {
 		const data = {
 			elements: elements,
