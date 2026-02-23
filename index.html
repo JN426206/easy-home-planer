@@ -1009,37 +1009,41 @@
 	};
     document.getElementById('btnLoad').onclick = () => document.getElementById('fileInput').click();
     document.getElementById('fileInput').onchange = (e) => {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-		const data = JSON.parse(ev.target.result);
+		const reader = new FileReader();
+		reader.onload = (ev) => {
+			const data = JSON.parse(ev.target.result);
 
-		elements = data.elements || [];
-		images = [];
+			// ✅ Obsługa starego formatu (tablica)
+			if (Array.isArray(data)) {
+				elements = data;
+				images = [];
+			} else {
+				elements = data.elements || [];
+				images = [];
+				if (data.images) {
+					data.images.forEach(imData => {
+						const img = new Image();
+						img.onload = () => render();
+						img.src = imData.base64;
+						images.push({
+							base64: imData.base64,
+							img: img,
+							x: imData.x,
+							y: imData.y,
+							width: imData.width,
+							height: imData.height,
+							rotation: imData.rotation || 0,
+							flipX: imData.flipX || 1,
+							flipY: imData.flipY || 1
+						});
+					});
+				}
+			}
 
-		if (data.images) {
-			data.images.forEach(imData => {
-				const img = new Image();
-				img.onload = () => render();
-				img.src = imData.base64;
-
-				images.push({
-					base64: imData.base64,
-					img: img,
-					x: imData.x,
-					y: imData.y,
-					width: imData.width,
-					height: imData.height,
-					rotation: imData.rotation || 0,
-					flipX: imData.flipX || 1,
-					flipY: imData.flipY || 1
-				});
-			});
-		}
-
-		render();
+			render();
+		};
+		reader.readAsText(e.target.files[0]);
 	};
-        reader.readAsText(e.target.files[0]);
-    };
 	// ✅ DODAJ: funkcja licząca zestawienie długości warstw
 	function updateSummary() {
 		const summary = {
