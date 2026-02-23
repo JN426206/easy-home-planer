@@ -124,6 +124,8 @@
     <div class="tool-group">
         <h3>3. Akcje i Pliki</h3>
         <button id="btnLine" class="active">Rysuj Linię (Klik -> Klik)</button>
+		<button id="btnAddImage" style="background:#8e44ad;">🖼️ Dodaj obraz</button>
+		<input type="file" id="imageInput" accept="image/*" style="display:none">
         <button id="btnSave" style="background: #27ae60;">💾 Zapisz do pliku .json</button>
         <button id="btnLoad" style="background: #2980b9;">📂 Wczytaj projekt</button>
         <input type="file" id="fileInput" style="display:none" accept=".json">
@@ -218,7 +220,11 @@
 	let measureMode = false;
 	let measureBasePoint = null;
 	let measureElement = null;
-	let measureOrientation = "perp"; // "perp" albo "parallel"
+	let measureOrientation = "perp"; // "perp" albo "parallel
+	let images = [];              // ✅ przechowuje obrazy (base64)
+	let selectedImage = null;     // ✅ zaznaczony obraz
+	let isDraggingImage = false;  // ✅ drag obrazka
+	let imageDragOffset = { x:0, y:0 };
     const zoomRange = document.getElementById('zoomRange');
     const zoomVal = document.getElementById('zoomVal');
 	
@@ -457,6 +463,16 @@
 		}
         // 2. Tryb SELEKCJI i PRZESUWANIA
         if (selectionMode) {
+			const foundImage = findImageAt(pos.x, pos.y);
+			if (foundImage) {
+				selectedImage = foundImage;
+				selectedElement = null;
+				isDraggingImage = true;
+				imageDragOffset.x = pos.x - foundImage.x;
+				imageDragOffset.y = pos.y - foundImage.y;
+				render();
+				return;
+			}
             const found = findElementAt(pos.x, pos.y);
             if (found) {
                 selectedElement = found;
@@ -502,13 +518,54 @@
         }
         render();
     });
+	
+	document.getElementById('btnAddImage').onclick = () =>
+    document.getElementById('imageInput').click();
 
-    function deleteSelected() { // <--- DODANO: brakująca funkcja usuwania
-        elements = elements.filter(el => el !== selectedElement);
-        selectedElement = null;
-        editPanel.style.display = 'none';
-        render();
-    }
+	document.getElementById('imageInput').onchange = (e) => {
+		const file = e.target.files[0];
+		if (!file) return;
+
+		const reader = new FileReader();
+		reader.onload = (ev) => {
+			const img = new Image();
+			img.onload = () => {
+				images.push({
+					base64: ev.target.result,
+					img: img,
+					x: mousePos.x,
+					y: mousePos.y,
+					width: img.width,
+					height: img.height
+				});
+				render();
+			};
+			img.src = ev.target.result;
+		};
+		reader.readAsDataURL(file);
+	};
+	
+	function findImageAt(x, y) {
+		return images.find(im =>
+			x >= im.x &&
+			x <= im.x + im.width &&
+			y >= im.y &&
+			y <= im.y + im.height
+		);
+	}
+
+	function deleteSelected() {
+		if (selectedElement) {
+			elements = elements.filter(el => el !== selectedElement);
+			selectedElement = null;
+		}
+		if (selectedImage) {
+			images = images.filter(im => im !== selectedImage);
+			selectedImage = null;
+		}
+		editPanel.style.display = 'none';
+		render();
+	}
 	
     document.getElementById('btnDelete').onclick = deleteSelected;
 
@@ -584,7 +641,10 @@
 			document.getElementById('editX2').value = selectedElement.x2;
 			document.getElementById('editY2').value = selectedElement.y2;
 		}
-
+		if (isDraggingImage && selectedImage) {
+			selectedImage.x = mousePos.x - imageDragOffset.x;
+			selectedImage.y = mousePos.y - imageDragOffset.y;
+		}
 		updateStatus();
 		// ✅ aktualizacja punktu startowego z miarki
 		if (measureMode && measureBasePoint) {
@@ -633,6 +693,7 @@
 		measureMode = false;
 		measureBasePoint = null;
 		measureElement = null;
+		isDraggingImage = false;
     });
     // Obsługa Zoom suwakiem
     zoomRange.oninput = (e) => {
@@ -676,6 +737,17 @@
         ctx.moveTo(0, mousePos.y); ctx.lineTo(canvas.width, mousePos.y);
         ctx.moveTo(mousePos.x, 0); ctx.lineTo(mousePos.x, canvas.height);
         ctx.stroke();
+		
+		// ✅ Rysowanie obrazów
+		images.forEach(im => {
+			ctx.drawImage(im.img, im.x, im.y, im.width, im.height);
+
+			if (im === selectedImage) {
+				ctx.strokeStyle = "#ff00ff";
+				ctx.lineWidth = 2 / scale;
+				ctx.strokeRect(im.x, im.y, im.width, im.height);
+			}
+		});
 
 		elements.forEach(el => {
             ctx.beginPath();
@@ -742,17 +814,54 @@
     // Blokada menu i obsługa plików (jak wcześniej)
     canvas.oncontextmenu = (e) => e.preventDefault();
     document.getElementById('btnClear').onclick = () => { if(confirm("Wyczyścić?")) { elements = []; isDrawing = false; render(); } };
-    document.getElementById('btnSave').onclick = () => {
-        const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(JSON.stringify(elements));
-        const link = document.createElement('a');
-        link.setAttribute('href', dataUri);
-        link.setAttribute('download', 'projekt.json');
-        link.click();
-    };
+	document.getElementById('btnSave').onclick = () => {
+		const data = {
+			elements: elements,
+			images: images.map(im => ({
+				base64: im.base64,
+				x: im.x,
+				y: im.y,
+				width: im.width,
+				height: im.height
+			}))
+		};
+
+		const dataUri = 'data:application/json;charset=utf-8,'+
+			encodeURIComponent(JSON.stringify(data));
+
+		const link = document.createElement('a');
+		link.setAttribute('href', dataUri);
+		link.setAttribute('download', 'projekt.json');
+		link.click();
+	};
     document.getElementById('btnLoad').onclick = () => document.getElementById('fileInput').click();
     document.getElementById('fileInput').onchange = (e) => {
         const reader = new FileReader();
-        reader.onload = (ev) => { elements = JSON.parse(ev.target.result); render(); };
+        reader.onload = (ev) => {
+		const data = JSON.parse(ev.target.result);
+
+		elements = data.elements || [];
+		images = [];
+
+		if (data.images) {
+			data.images.forEach(imData => {
+				const img = new Image();
+				img.onload = () => render();
+				img.src = imData.base64;
+
+				images.push({
+					base64: imData.base64,
+					img: img,
+					x: imData.x,
+					y: imData.y,
+					width: imData.width,
+					height: imData.height
+				});
+			});
+		}
+
+		render();
+	};
         reader.readAsText(e.target.files[0]);
     };
 	// ✅ DODAJ: funkcja licząca zestawienie długości warstw
