@@ -225,6 +225,9 @@
 	let selectedImage = null;     // ✅ zaznaczony obraz
 	let isDraggingImage = false;  // ✅ drag obrazka
 	let imageDragOffset = { x:0, y:0 };
+	let isResizingImage = false;
+	let resizeHandle = null; // 'br'
+	let isRotatingImage = false;
     const zoomRange = document.getElementById('zoomRange');
     const zoomVal = document.getElementById('zoomVal');
 	
@@ -298,6 +301,15 @@
 		// ✅ ZMIANA orientacji miarki klawiszem R
 		if (measureMode && e.key.toLowerCase() === 'q') {		
 			measureOrientation = (measureOrientation === "perp") ? "parallel" : "perp";
+		}
+		if (selectedImage && e.key.toLowerCase() === 'x') {
+			selectedImage.flipX *= -1;
+			render();
+		}
+
+		if (selectedImage && e.key.toLowerCase() === 'y') {
+			selectedImage.flipY *= -1;
+			render();
 		}
         // --- Logika wpisywania długości ---
         if (isDrawing) {
@@ -378,6 +390,22 @@
 		});
 
 		return best;
+	}
+	
+	function getImageHandle(im, x, y) {
+		const handleSize = 10 / scale;
+		const right = im.x + im.width;
+		const bottom = im.y + im.height;
+
+		if (
+			x >= right - handleSize &&
+			x <= right + handleSize &&
+			y >= bottom - handleSize &&
+			y <= bottom + handleSize
+		) {
+			return "br"; // bottom-right
+		}
+		return null;
 	}
 
 	function processDirectInput() {
@@ -465,6 +493,22 @@
         if (selectionMode) {
 			const foundImage = findImageAt(pos.x, pos.y);
 			if (foundImage) {
+
+				const handle = getImageHandle(foundImage, pos.x, pos.y);
+
+				if (handle) {
+					selectedImage = foundImage;
+					isResizingImage = true;
+					resizeHandle = handle;
+					return;
+				}
+
+				if (e.altKey) {  // ALT = obracanie
+					selectedImage = foundImage;
+					isRotatingImage = true;
+					return;
+				}
+
 				selectedImage = foundImage;
 				selectedElement = null;
 				isDraggingImage = true;
@@ -536,7 +580,10 @@
 					x: mousePos.x,
 					y: mousePos.y,
 					width: img.width,
-					height: img.height
+					height: img.height,
+					rotation: 0,
+					flipX: 1,
+					flipY: 1
 				});
 				render();
 			};
@@ -645,6 +692,19 @@
 			selectedImage.x = mousePos.x - imageDragOffset.x;
 			selectedImage.y = mousePos.y - imageDragOffset.y;
 		}
+		// ✅ Resize
+		if (isResizingImage && selectedImage) {
+			selectedImage.width = Math.max(20, mousePos.x - selectedImage.x);
+			selectedImage.height = Math.max(20, mousePos.y - selectedImage.y);
+		}
+
+		// ✅ Rotacja
+		if (isRotatingImage && selectedImage) {
+			const cx = selectedImage.x + selectedImage.width / 2;
+			const cy = selectedImage.y + selectedImage.height / 2;
+			const angle = Math.atan2(mousePos.y - cy, mousePos.x - cx);
+			selectedImage.rotation = angle;
+		}
 		updateStatus();
 		// ✅ aktualizacja punktu startowego z miarki
 		if (measureMode && measureBasePoint) {
@@ -694,6 +754,9 @@
 		measureBasePoint = null;
 		measureElement = null;
 		isDraggingImage = false;
+		isResizingImage = false;
+		isRotatingImage = false;
+		resizeHandle = null;
     });
     // Obsługa Zoom suwakiem
     zoomRange.oninput = (e) => {
@@ -740,13 +803,46 @@
 		
 		// ✅ Rysowanie obrazów
 		images.forEach(im => {
-			ctx.drawImage(im.img, im.x, im.y, im.width, im.height);
 
+			ctx.save();
+
+			const cx = im.x + im.width / 2;
+			const cy = im.y + im.height / 2;
+
+			ctx.translate(cx, cy);
+			ctx.rotate(im.rotation);
+			ctx.scale(im.flipX, im.flipY);
+
+			ctx.drawImage(
+				im.img,
+				-im.width / 2,
+				-im.height / 2,
+				im.width,
+				im.height
+			);
+
+			// ✅ Ramka zaznaczenia
 			if (im === selectedImage) {
 				ctx.strokeStyle = "#ff00ff";
 				ctx.lineWidth = 2 / scale;
-				ctx.strokeRect(im.x, im.y, im.width, im.height);
+				ctx.strokeRect(
+					-im.width / 2,
+					-im.height / 2,
+					im.width,
+					im.height
+				);
+
+				// ✅ Uchwyt resize (prawy dolny)
+				ctx.fillStyle = "#ff00ff";
+				ctx.fillRect(
+					im.width / 2 - 6 / scale,
+					im.height / 2 - 6 / scale,
+					12 / scale,
+					12 / scale
+				);
 			}
+
+			ctx.restore();
 		});
 
 		elements.forEach(el => {
@@ -822,7 +918,10 @@
 				x: im.x,
 				y: im.y,
 				width: im.width,
-				height: im.height
+				height: im.height,
+				rotation: im.rotation,
+				flipX: im.flipX,
+				flipY: im.flipY
 			}))
 		};
 
@@ -855,7 +954,10 @@
 					x: imData.x,
 					y: imData.y,
 					width: imData.width,
-					height: imData.height
+					height: imData.height,
+					rotation: imData.rotation || 0,
+					flipX: imData.flipX || 1,
+					flipY: imData.flipY || 1
 				});
 			});
 		}
