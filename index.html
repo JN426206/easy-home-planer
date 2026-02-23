@@ -215,6 +215,10 @@
     let mousePos = { x: 0, y: 0 };
     let isShiftPressed = false;
 	let scale = 1.0;
+	let measureMode = false;
+	let measureBasePoint = null;
+	let measureElement = null;
+	let measureOrientation = "perp"; // "perp" albo "parallel"
     const zoomRange = document.getElementById('zoomRange');
     const zoomVal = document.getElementById('zoomVal');
 	
@@ -285,7 +289,10 @@
             isDrawing = false; startPoint = null; inputBuffer = "";
             inputOverlay.style.display = 'none'; render(); return;
         }
-
+		// ✅ ZMIANA orientacji miarki klawiszem R
+		if (measureMode && e.key.toLowerCase() === 'r') {
+			measureOrientation = (measureOrientation === "perp") ? "parallel" : "perp";
+		}
         // --- Logika wpisywania długości ---
         if (isDrawing) {
             // Jeśli użytkownik wpisuje cyfry, kropkę lub literę 'm'
@@ -332,7 +339,41 @@
 			const y = Math.round((e.clientY - rect.top) / scale);
 			return { x, y };
 		}
-	
+	function getEdgeBasePoint(el, clickX, clickY) {
+
+		const dx = el.x2 - el.x1;
+		const dy = el.y2 - el.y1;
+		const len = Math.sqrt(dx*dx + dy*dy);
+		if (len === 0) return null;
+
+		const nx = -dy / len; // normalna
+		const ny = dx / len;
+
+		const offset = el.t / 2;
+
+		// 4 możliwe krawędziowe punkty (2 końce x 2 strony)
+		const candidates = [
+			{ x: el.x1 + nx*offset, y: el.y1 + ny*offset },
+			{ x: el.x1 - nx*offset, y: el.y1 - ny*offset },
+			{ x: el.x2 + nx*offset, y: el.y2 + ny*offset },
+			{ x: el.x2 - nx*offset, y: el.y2 - ny*offset },
+		];
+
+		// wybierz najbliższy do miejsca kliknięcia
+		let best = candidates[0];
+		let bestDist = getDist(clickX, clickY, best.x, best.y);
+
+		candidates.forEach(p => {
+			const d = getDist(clickX, clickY, p.x, p.y);
+			if (d < bestDist) {
+				best = p;
+				bestDist = d;
+			}
+		});
+
+		return best;
+	}
+
 	function processDirectInput() {
         let length = 0;
         if (inputBuffer.endsWith('m')) {
@@ -401,7 +442,19 @@
 		}
 
         const pos = getMousePos(e);
+		
+		// ✅ CTRL + klik = uruchom miarkę
+		if (e.ctrlKey && !selectionMode) {
 
+			const found = findElementAt(pos.x, pos.y);
+			if (found) {
+
+				measureMode = true;
+				measureElement = found;
+				measureBasePoint = getEdgeBasePoint(found, pos.x, pos.y);
+				return;
+			}
+		}
         // 2. Tryb SELEKCJI i PRZESUWANIA
         if (selectionMode) {
             const found = findElementAt(pos.x, pos.y);
@@ -432,7 +485,7 @@
         } 
 
         // 3. Tryb RYSOWANIA (wykona się tylko jeśli selectionMode == false) <--- ZMIANA: logika rysowania oddzielona
-        if (!isDrawing) {
+        if (!isDrawing || measureMode) {
             isDrawing = true;
             startPoint = { ...mousePos }; 
         } else {
@@ -533,11 +586,53 @@
 		}
 
 		updateStatus();
+		// ✅ aktualizacja punktu startowego z miarki
+		if (measureMode && measureBasePoint) {
+
+			let dx = mousePos.x - measureBasePoint.x;
+			let dy = mousePos.y - measureBasePoint.y;
+
+			if (measureOrientation === "perp") {
+
+				const ex = measureElement.x2 - measureElement.x1;
+				const ey = measureElement.y2 - measureElement.y1;
+				const len = Math.sqrt(ex*ex + ey*ey);
+				const nx = -ey / len;
+				const ny = ex / len;
+
+				const dist = dx*nx + dy*ny;
+
+				startPoint = {
+					x: Math.round(measureBasePoint.x + nx*dist),
+					y: Math.round(measureBasePoint.y + ny*dist)
+				};
+
+			} else {
+
+				const ex = measureElement.x2 - measureElement.x1;
+				const ey = measureElement.y2 - measureElement.y1;
+				const len = Math.sqrt(ex*ex + ey*ey);
+				const ux = ex / len;
+				const uy = ey / len;
+
+				const dist = dx*ux + dy*uy;
+
+				startPoint = {
+					x: Math.round(measureBasePoint.x + ux*dist),
+					y: Math.round(measureBasePoint.y + uy*dist)
+				};
+			}
+
+			isDrawing = true;
+		}
 		render();
 	});
     // --- Dodanie MouseUp ---
     window.addEventListener('mouseup', () => {
         isDraggingElement = false; // <--- DODANO: zatrzymuje przesuwanie po puszczeniu myszki
+		measureMode = false;
+		measureBasePoint = null;
+		measureElement = null;
     });
     // Obsługa Zoom suwakiem
     zoomRange.oninput = (e) => {
@@ -601,6 +696,29 @@
                 ctx.setLineDash([]);
             }
         });
+		
+		// ✅ Rysowanie miarki
+		if (measureMode && measureBasePoint && startPoint) {
+
+			ctx.beginPath();
+			ctx.strokeStyle = "#e67e22";
+			ctx.lineWidth = 2 / scale;
+			ctx.setLineDash([10,5]);
+			ctx.moveTo(measureBasePoint.x, measureBasePoint.y);
+			ctx.lineTo(startPoint.x, startPoint.y);
+			ctx.stroke();
+			ctx.setLineDash([]);
+
+			const d = getDist(measureBasePoint.x, measureBasePoint.y, startPoint.x, startPoint.y);
+
+			ctx.fillStyle = "#e67e22";
+			ctx.font = `bold ${14/scale}px Arial`;
+			ctx.fillText(
+				`${Math.round(d)} cm`,
+				startPoint.x + (10/scale),
+				startPoint.y - (10/scale)
+			);
+		}
 
         // 3. Podgląd aktywnego rysowania
         if (isDrawing && startPoint) {
