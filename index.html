@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Prosty Projektant Domu 2D/3D Concept</title>
+<style>
+    body { 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        margin: 0; 
+        display: flex; 
+        height: 100vh; 
+        overflow: hidden; 
+        background: #1a1a1a; 
+    }
+    
+    #sidebar { 
+        width: 350px; /* Zwiększona szerokość */
+        min-width: 350px;
+        background: #2c3e50; 
+        color: white; 
+        padding: 20px; 
+        display: flex; 
+        flex-direction: column; 
+        gap: 15px; 
+        box-shadow: 4px 0 10px rgba(0,0,0,0.5);
+        overflow-y: auto; /* Własny scroll panelu */
+        z-index: 10;
+    }
+
+    /* Stylizacja paska przewijania dla sidebar */
+    #sidebar::-webkit-scrollbar { width: 8px; }
+    #sidebar::-webkit-scrollbar-track { background: #2c3e50; }
+    #sidebar::-webkit-scrollbar-thumb { background: #456789; border-radius: 4px; }
+
+    #canvas-container { 
+        flex-grow: 1; 
+        position: relative; 
+        overflow: auto; 
+        background: #fff; 
+    }
+
+    canvas { 
+        display: block; 
+        background-color: #ffffff;
+        background-image: radial-gradient(#ccc 1px, transparent 1px); 
+        background-size: 20px 20px; 
+        transform-origin: 0 0;
+    }
+
+    .tool-group { 
+        background: #34495e;
+        padding: 15px; 
+        border-radius: 8px;
+        border-left: 4px solid #3498db;
+    }
+
+    h3 { margin: 0 0 10px 0; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: #5dade2; }
+    
+    label { display: block; font-size: 12px; margin-bottom: 5px; color: #bdc3c7; }
+
+    button { 
+        width: 100%; 
+        padding: 10px; 
+        margin: 4px 0; 
+        cursor: pointer; 
+        border: none; 
+        border-radius: 4px; 
+        background: #2c3e50; 
+        color: white; 
+        font-weight: bold;
+        transition: all 0.2s; 
+    }
+    button:hover { background: #3498db; transform: translateY(-1px); }
+    button.active { background: #e74c3c; box-shadow: inset 0 0 10px rgba(0,0,0,0.3); }
+
+    input, select { 
+        width: 100%; 
+        padding: 8px; 
+        margin-bottom: 12px; 
+        border-radius: 4px; 
+        border: 1px solid #1a1a1a; 
+        background: #ecf0f1;
+        font-size: 14px;
+    }
+
+    #status { 
+        position: fixed; 
+        bottom: 20px; 
+        left: 370px; 
+        background: rgba(0,0,0,0.8); 
+        color: #fff;
+        padding: 8px 15px; 
+        border-radius: 20px; 
+        font-size: 13px; 
+        pointer-events: none;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+</style>
+
+</head>
+<body>
+
+<div id="sidebar">
+    <h2>Projektant 2D</h2>
+    
+    <div class="tool-group">
+        <h3>1. Wybierz Warstwę</h3>
+        <select id="layerSelect">
+            <option value="wall">Konstrukcja (Ściany)</option>
+            <option value="water">Woda / Kanalizacja (Niebieski)</option>
+            <option value="elec">Elektryka (Żółty)</option>
+            <option value="vent">Wentylacja (Zielony)</option>
+        </select>
+    </div>
+
+    <div class="tool-group">
+        <h3>2. Parametry Obiektu</h3>
+        <label>Wysokość montażu (Z) [cm]:</label>
+        <input type="number" id="heightZ" value="0">
+        <label>Grubość/Średnica [cm]:</label>
+        <input type="number" id="thickness" value="10">
+    </div>
+
+    <div class="tool-group">
+        <h3>3. Akcje i Pliki</h3>
+        <button id="btnLine" class="active">Rysuj Linię (Klik -> Klik)</button>
+        <button id="btnSave" style="background: #27ae60;">💾 Zapisz do pliku .json</button>
+        <button id="btnLoad" style="background: #2980b9;">📂 Wczytaj projekt</button>
+        <input type="file" id="fileInput" style="display:none" accept=".json">
+        <button id="btnClear">Wyczyść Projekt</button>
+    </div>
+	<div class="tool-group">
+		<h3>4. Widok</h3>
+		<label>Skala (Zoom): <span id="zoomVal">100</span>%</label>
+		<input type="range" id="zoomRange" min="10" max="400" value="100">
+		<button id="btnResetView">Resetuj Widok</button>
+	</div>
+	<div class="tool-group">
+		<h3>5. Edycja Elementu</h3>
+		<button id="btnSelectMode">Tryb: SELEKCJA (S)</button>
+		<div id="editPanel" style="display:none; margin-top:10px; border-top:1px solid #555; padding-top:10px;">
+			<p style="font-size:12px; color:#aaa;">Edytuj zaznaczony:</p>
+			
+			<div style="display:grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+				<div>
+					<label>Start X1 [cm]:</label>
+					<input type="number" id="editX1">
+				</div>
+				<div>
+					<label>Start Y1 [cm]:</label>
+					<input type="number" id="editY1">
+				</div>
+				<div>
+					<label>Koniec X2 [cm]:</label>
+					<input type="number" id="editX2">
+				</div>
+				<div>
+					<label>Koniec Y2 [cm]:</label>
+					<input type="number" id="editY2">
+				</div>
+			</div>
+
+			<label style="color:#f1c40f;">Długość całkowita [cm]:</label>
+			<input type="number" id="editLen">
+
+			<label>Wysokość Z [cm]:</label>
+			<input type="number" id="editZ">
+			
+			<label>Grubość [cm]:</label>
+			<input type="number" id="editT">
+
+			<button id="btnUpdate" style="background:#27ae60;">ZASTOSUJ ZMIANY</button>
+			<button id="btnDelete" style="background:#c0392b;">USUŃ (Del)</button>
+		</div>
+
+	</div>
+	<!-- ✅ DODAJ: Sekcja zestawienia długości -->
+	<div class="tool-group">
+		<h3>6. Zestawienie długości</h3>
+		<div id="summaryPanel" style="font-size:13px; line-height:1.6;">
+			<div>Ściany: <strong><span id="sum-wall">0</span></strong> cm</div>
+			<div>Woda/Kan: <strong><span id="sum-water">0</span></strong> cm</div>
+			<div>Elektryka: <strong><span id="sum-elec">0</span></strong> cm</div>
+			<div>Wentylacja: <strong><span id="sum-vent">0</span></strong> cm</div>
+		</div>
+	</div>
+
+
+
+    <div style="margin-top: auto; font-size: 11px; color: #bdc3c7;">
+        * Skala: 1px = 1cm<br>
+        * Lewy klik: rysowanie<br>
+        * Prawy klik: usuń ostatni
+    </div>
+</div>
+
+<div id="canvas-container">
+	<div id="input-overlay" style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%); 
+		background: rgba(44, 62, 80, 0.9); color: white; padding: 10px 20px; border-radius: 20px; 
+		display: none; font-size: 18px; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 1000;">
+		Długość: <span id="input-buffer"></span>
+	</div>
+    <canvas id="mainCanvas"></canvas>
+    <div id="status">X: 0, Y: 0 | Z: 0 cm</div>
+</div>
+<script>
+    const canvas = document.getElementById('mainCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('canvas-container');
+    const status = document.getElementById('status');
+
+    let elements = [];
+    let isDrawing = false;
+    let startPoint = null;
+    let mousePos = { x: 0, y: 0 };
+    let isShiftPressed = false;
+	let scale = 1.0;
+    const zoomRange = document.getElementById('zoomRange');
+    const zoomVal = document.getElementById('zoomVal');
+	
+	let inputBuffer = ""; // Bufor dla wpisywanej długości
+    const inputOverlay = document.getElementById('input-overlay');
+    const inputBufferDisplay = document.getElementById('input-buffer');
+
+    canvas.width = 5000; 
+    canvas.height = 5000;
+
+    const colors = {
+        wall: '#2c3e50',
+        water: '#2980b9',
+        elec: '#f1c40f',
+        vent: '#27ae60'
+    };
+	
+	let selectionMode = false;
+    let selectedElement = null;
+
+    // Przełącznik trybu
+    const btnSelectMode = document.getElementById('btnSelectMode');
+    const editPanel = document.getElementById('editPanel');
+	
+	function getDist(x1, y1, x2, y2) {
+        return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+    }
+	
+    btnSelectMode.onclick = () => {
+        selectionMode = !selectionMode;
+        isDrawing = false;
+        startPoint = null;
+        selectedElement = null;
+        btnSelectMode.classList.toggle('active', selectionMode);
+        btnSelectMode.innerText = selectionMode ? "Tryb: RYSOWANIE (S)" : "Tryb: SELEKCJA (S)";
+        editPanel.style.display = 'none';		
+		isDraggingElement = false;
+        render();
+    };
+	
+	let isDraggingElement = false;
+    let dragStartPos = { x: 0, y: 0 };
+    let originalElPos = { x1: 0, y1: 0, x2: 0, y2: 0 };
+
+    // --- Obsługa klawiszy strzałek ---
+    window.addEventListener('keydown', (e) => {
+        if (selectedElement && !inputBuffer) { // Nie przesuwaj, gdy wpisujemy długość
+            const step = e.shiftKey ? 10 : 1;
+            let moved = false;
+
+            if (e.key === 'ArrowUp')    { selectedElement.y1 -= step; selectedElement.y2 -= step; moved = true; }
+            if (e.key === 'ArrowDown')  { selectedElement.y1 += step; selectedElement.y2 += step; moved = true; }
+            if (e.key === 'ArrowLeft')  { selectedElement.x1 -= step; selectedElement.x2 -= step; moved = true; }
+            if (e.key === 'ArrowRight') { selectedElement.x1 += step; selectedElement.x2 += step; moved = true; }
+
+            if (moved) {
+                e.preventDefault();
+                render();
+            }
+        }
+		// Skróty klawiszowe (S dla selekcji, Delete dla usuwania)
+        if (e.key.toLowerCase() === 's') btnSelectMode.onclick();
+        if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElement) deleteSelected();
+		
+        // Obsługa Shift i ESC (zostaje z poprzedniej wersji)
+        if (e.key === 'Shift') isShiftPressed = true;
+        if (e.key === 'Escape') {
+            isDrawing = false; startPoint = null; inputBuffer = "";
+            inputOverlay.style.display = 'none'; render(); return;
+        }
+
+        // --- Logika wpisywania długości ---
+        if (isDrawing) {
+            // Jeśli użytkownik wpisuje cyfry, kropkę lub literę 'm'
+            if (/^[0-9.m]$/.test(e.key)) {
+                inputBuffer += e.key;
+                inputOverlay.style.display = 'block';
+                inputBufferDisplay.innerText = inputBuffer;
+            } 
+            
+            // Usuwanie znaku
+            else if (e.key === 'Backspace') {
+                inputBuffer = inputBuffer.slice(0, -1);
+                if (inputBuffer === "") inputOverlay.style.display = 'none';
+                inputBufferDisplay.innerText = inputBuffer;
+            }
+
+            // Zatwierdzenie Enterem
+            else if (e.key === 'Enter' && inputBuffer.length > 0) {
+                processDirectInput();
+            }
+        }
+    });
+
+    // Funkcja sprawdzająca czy kliknięto w linię (z tolerancją 5px)
+    function findElementAt(x, y) {
+        return elements.find(el => {
+            const L2 = Math.pow(el.x2 - el.x1, 2) + Math.pow(el.y2 - el.y1, 2);
+            if (L2 === 0) return false;
+            const r = ((x - el.x1) * (el.x2 - el.x1) + (y - el.y1) * (el.y2 - el.y1)) / L2;
+            if (r < 0 || r > 1) return false;
+            const dist = Math.sqrt(
+				Math.pow(x - (el.x1 + r * (el.x2 - el.x1)), 2) +
+				Math.pow(y - (el.y1 + r * (el.y2 - el.y1)), 2)
+			);
+            return dist < (el.t / 2 + 5);
+        });
+    }
+	
+	
+	function getMousePos(e) {
+			const rect = canvas.getBoundingClientRect();
+			// Uwzględniamy scroll kontenera i aktualną skalę
+			const x = Math.round((e.clientX - rect.left) / scale);
+			const y = Math.round((e.clientY - rect.top) / scale);
+			return { x, y };
+		}
+	
+	function processDirectInput() {
+        let length = 0;
+        if (inputBuffer.endsWith('m')) {
+            length = parseFloat(inputBuffer.slice(0, -1)) * 100; // metry na cm
+        } else {
+            length = parseFloat(inputBuffer); // domyślnie cm
+        }
+
+        if (!isNaN(length) && startPoint) {
+            // Obliczamy wektor kierunku od punktu startowego do myszy
+            const dx = mousePos.x - startPoint.x;
+            const dy = mousePos.y - startPoint.y;
+            const angle = Math.atan2(dy, dx);
+
+            // Jeśli Shift jest wciśnięty, wymuś kąty proste przy obliczaniu wektora
+            let finalAngle = angle;
+            if (isShiftPressed) {
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    finalAngle = dx > 0 ? 0 : Math.PI;
+                } else {
+                    finalAngle = dy > 0 ? Math.PI/2 : -Math.PI/2;
+                }
+            }
+
+            // Wyznaczamy nowy punkt końcowy na podstawie wpisanej długości
+            const newX = Math.round(startPoint.x + Math.cos(finalAngle) * length);
+            const newY = Math.round(startPoint.y + Math.sin(finalAngle) * length);
+
+            // Dodajemy element
+            elements.push({
+                type: document.getElementById('layerSelect').value,
+                x1: startPoint.x, y1: startPoint.y,
+                x2: newX, y2: newY,
+                z: parseFloat(document.getElementById('heightZ').value),
+                t: parseFloat(document.getElementById('thickness').value)
+            });
+
+            // Przesuwamy punkt startowy na koniec nowej linii (ciągłość)
+            startPoint = { x: newX, y: newY };
+            mousePos = { x: newX, y: newY }; // "Przyciągnij" kursor wizualnie
+            
+            // Czyścimy bufor
+            inputBuffer = "";
+            inputOverlay.style.display = 'none';
+            render();
+        }
+    }
+
+    window.addEventListener('keyup', (e) => { 
+        if (e.key === 'Shift') isShiftPressed = false; 
+    });
+
+    // --- Zaktualizowana logika MouseDown ---
+    canvas.addEventListener('mousedown', (e) => {
+        // 1. Prawy przycisk myszy
+		if (e.button === 2) {
+			if (isDrawing) {
+				isDrawing = false;
+				startPoint = null;
+			} 
+			else if (!selectionMode) {   // <-- DODAĆ
+				elements.pop();
+			}
+			render();
+			return;
+		}
+
+        const pos = getMousePos(e);
+
+        // 2. Tryb SELEKCJI i PRZESUWANIA
+        if (selectionMode) {
+            const found = findElementAt(pos.x, pos.y);
+            if (found) {
+                selectedElement = found;
+                editPanel.style.display = 'block';
+                
+                // Wypełnianie pól koordynatami
+                document.getElementById('editX1').value = found.x1;
+                document.getElementById('editY1').value = found.y1;
+                document.getElementById('editX2').value = found.x2;
+                document.getElementById('editY2').value = found.y2;
+                document.getElementById('editZ').value = found.z;
+                document.getElementById('editT').value = found.t;
+                
+                const len = getDist(found.x1, found.y1, found.x2, found.y2);
+                document.getElementById('editLen').value = Math.round(len);
+                
+                isDraggingElement = true;
+                dragStartPos = { ...pos };
+                originalElPos = { x1: found.x1, y1: found.y1, x2: found.x2, y2: found.y2 };
+            } else {
+                selectedElement = null;
+                editPanel.style.display = 'none';
+            }
+            render();
+            return; // <--- DODANO: To jest kluczowe! Kończy funkcję, aby NIE zaczęło rysować podczas edycji
+        } 
+
+        // 3. Tryb RYSOWANIA (wykona się tylko jeśli selectionMode == false) <--- ZMIANA: logika rysowania oddzielona
+        if (!isDrawing) {
+            isDrawing = true;
+            startPoint = { ...mousePos }; 
+        } else {
+            elements.push({
+                type: document.getElementById('layerSelect').value,
+                x1: startPoint.x,
+                y1: startPoint.y,
+                x2: mousePos.x,
+                y2: mousePos.y,
+                z: parseFloat(document.getElementById('heightZ').value),
+                t: parseFloat(document.getElementById('thickness').value)
+            });
+            startPoint = { ...mousePos }; 
+        }
+        render();
+    });
+
+    function deleteSelected() { // <--- DODANO: brakująca funkcja usuwania
+        elements = elements.filter(el => el !== selectedElement);
+        selectedElement = null;
+        editPanel.style.display = 'none';
+        render();
+    }
+	
+    document.getElementById('btnDelete').onclick = deleteSelected;
+
+    // Logika przycisku ZASTOSUJ ZMIANY
+    document.getElementById('btnUpdate').onclick = () => {
+        if (!selectedElement) return;
+        selectedElement.x1 = parseInt(document.getElementById('editX1').value);
+        selectedElement.y1 = parseInt(document.getElementById('editY1').value);
+        selectedElement.x2 = parseInt(document.getElementById('editX2').value);
+        selectedElement.y2 = parseInt(document.getElementById('editY2').value);
+        selectedElement.z = parseFloat(document.getElementById('editZ').value);
+        selectedElement.t = parseFloat(document.getElementById('editT').value);
+        
+        // Przeliczenie jeśli zmieniono długość ręcznie
+        const newLen = parseFloat(document.getElementById('editLen').value);
+        const currentLen = getDist(selectedElement.x1, selectedElement.y1, selectedElement.x2, selectedElement.y2);
+        
+        if (Math.abs(newLen - currentLen) > 0.5) {
+             const angle = Math.atan2(selectedElement.y2 - selectedElement.y1, selectedElement.x2 - selectedElement.x1);
+             selectedElement.x2 = Math.round(selectedElement.x1 + Math.cos(angle) * newLen);
+             selectedElement.y2 = Math.round(selectedElement.y1 + Math.sin(angle) * newLen);
+             document.getElementById('editX2').value = selectedElement.x2;
+             document.getElementById('editY2').value = selectedElement.y2;
+        }
+        render();
+    };
+	
+    // --- Zaktualizowana funkcja Statusu ---
+    function updateStatus() {
+        let mode = isDrawing ? "🚧 RYSOWANIE (ESC by przerwać)" : "🖱️ TRYB WOLNY (Kliknij by zacząć)";
+        let distStr = "";
+        
+        if (isDrawing && startPoint) {
+            const d = Math.sqrt(Math.pow(mousePos.x - startPoint.x, 2) + Math.pow(mousePos.y - startPoint.y, 2));
+            distStr = ` | Długość: ${(d/100).toFixed(2)} m (${Math.round(d)} cm)`;
+        }
+        
+        status.innerHTML = `<strong>${mode}</strong> | X: ${mousePos.x}, Y: ${mousePos.y} | Z: ${document.getElementById('heightZ').value} cm${distStr}`;
+    }
+
+	// --- Zaktualizowana logika MouseMove ---
+	canvas.addEventListener('mousemove', (e) => {
+		const pos = getMousePos(e);
+
+		// Aktualizacja pozycji myszy z uwzględnieniem Shifta dla podglądu rysowania
+		if (isDrawing && isShiftPressed && startPoint) {
+			const dx = Math.abs(pos.x - startPoint.x);
+			const dy = Math.abs(pos.y - startPoint.y);
+			if (dx > dy) {
+				mousePos.x = pos.x;
+				mousePos.y = startPoint.y;
+			} else {
+				mousePos.x = startPoint.x;
+				mousePos.y = pos.y;
+			}
+		} else {
+			mousePos = pos;
+		}
+
+		// Logika przesuwania elementu <--- DODANO: obsługa drag & drop
+		if (isDraggingElement && selectedElement && selectionMode) {
+			const dx = mousePos.x - dragStartPos.x;
+			const dy = mousePos.y - dragStartPos.y;
+			
+			selectedElement.x1 = originalElPos.x1 + dx;
+			selectedElement.y1 = originalElPos.y1 + dy;
+			selectedElement.x2 = originalElPos.x2 + dx;
+			selectedElement.y2 = originalElPos.y2 + dy;
+
+			// Aktualizacja pól w panelu edycji na żywo podczas przesuwania <--- DODANO
+			document.getElementById('editX1').value = selectedElement.x1;
+			document.getElementById('editY1').value = selectedElement.y1;
+			document.getElementById('editX2').value = selectedElement.x2;
+			document.getElementById('editY2').value = selectedElement.y2;
+		}
+
+		updateStatus();
+		render();
+	});
+    // --- Dodanie MouseUp ---
+    window.addEventListener('mouseup', () => {
+        isDraggingElement = false; // <--- DODANO: zatrzymuje przesuwanie po puszczeniu myszki
+    });
+    // Obsługa Zoom suwakiem
+    zoomRange.oninput = (e) => {
+        scale = e.target.value / 100;
+        zoomVal.innerText = e.target.value;
+        canvas.style.transform = `scale(${scale})`;
+        canvas.style.transformOrigin = "0 0";
+    };
+
+    // Obsługa Zoom kółkiem myszy
+    container.addEventListener('wheel', (e) => {
+        if (e.ctrlKey) { // Zoom tylko z CTRL, by nie psuć przewijania
+            e.preventDefault();
+            let newScale = scale + (e.deltaY > 0 ? -0.1 : 0.1);
+            newScale = Math.min(Math.max(0.1, newScale), 5); // Limit 10% - 500%
+            scale = newScale;
+            zoomRange.value = Math.round(scale * 100);
+            zoomVal.innerText = zoomRange.value;
+            canvas.style.transform = `scale(${scale})`;
+            canvas.style.transformOrigin = "0 0";
+        }
+    }, { passive: false });
+
+    document.getElementById('btnResetView').onclick = () => {
+        scale = 1.0;
+        zoomRange.value = 100;
+        zoomVal.innerText = 100;
+        canvas.style.transform = `scale(1)`;
+        container.scrollLeft = 0;
+        container.scrollTop = 0;
+    };
+
+    // Zmodyfikowana funkcja renderowania (linie pomocnicze muszą być rysowane w skali 1:1)
+    function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // 1. Linie pomocnicze (Crosshair)
+        ctx.beginPath();
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.15)";
+        ctx.lineWidth = 1 / scale; // Stała grubość linii bez względu na zoom
+        ctx.moveTo(0, mousePos.y); ctx.lineTo(canvas.width, mousePos.y);
+        ctx.moveTo(mousePos.x, 0); ctx.lineTo(mousePos.x, canvas.height);
+        ctx.stroke();
+
+		elements.forEach(el => {
+            ctx.beginPath();
+            ctx.moveTo(el.x1, el.y1);
+            ctx.lineTo(el.x2, el.y2);
+            ctx.lineWidth = el.t;
+            // Podświetlenie na czerwono jeśli zaznaczony
+            ctx.strokeStyle = (el === selectedElement) ? "#ff0000" : colors[el.type];
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            // Obramowanie dla zaznaczonego elementu
+            if (el === selectedElement) {
+                ctx.setLineDash([5, 5]);
+                ctx.lineWidth = el.t + 4;
+                ctx.strokeStyle = "rgba(255,0,0,0.3)";
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        });
+
+        // 3. Podgląd aktywnego rysowania
+        if (isDrawing && startPoint) {
+            ctx.beginPath();
+            ctx.lineWidth = document.getElementById('thickness').value;
+            ctx.strokeStyle = colors[document.getElementById('layerSelect').value] + "88";
+            ctx.moveTo(startPoint.x, startPoint.y);
+            ctx.lineTo(mousePos.x, mousePos.y);
+            ctx.stroke();
+
+            // Tekst z długością (skalowany)
+            const dist = Math.sqrt(Math.pow(mousePos.x - startPoint.x, 2) + Math.pow(mousePos.y - startPoint.y, 2));
+            ctx.fillStyle = "#000";
+            ctx.font = `bold ${14/scale}px Arial`;
+            ctx.fillText(`${(dist/100).toFixed(2)} m`, mousePos.x + (10/scale), mousePos.y - (10/scale));
+        }
+		// ✅ DODAJ NA KOŃCU render()
+		updateSummary();
+    }
+
+    // Blokada menu i obsługa plików (jak wcześniej)
+    canvas.oncontextmenu = (e) => e.preventDefault();
+    document.getElementById('btnClear').onclick = () => { if(confirm("Wyczyścić?")) { elements = []; isDrawing = false; render(); } };
+    document.getElementById('btnSave').onclick = () => {
+        const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(JSON.stringify(elements));
+        const link = document.createElement('a');
+        link.setAttribute('href', dataUri);
+        link.setAttribute('download', 'projekt.json');
+        link.click();
+    };
+    document.getElementById('btnLoad').onclick = () => document.getElementById('fileInput').click();
+    document.getElementById('fileInput').onchange = (e) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => { elements = JSON.parse(ev.target.result); render(); };
+        reader.readAsText(e.target.files[0]);
+    };
+	// ✅ DODAJ: funkcja licząca zestawienie długości warstw
+	function updateSummary() {
+		const summary = {
+			wall: 0,
+			water: 0,
+			elec: 0,
+			vent: 0
+		};
+
+		elements.forEach(el => {
+			const len = getDist(el.x1, el.y1, el.x2, el.y2);
+			summary[el.type] += len;
+		});
+
+		document.getElementById('sum-wall').innerText = Math.round(summary.wall);
+		document.getElementById('sum-water').innerText = Math.round(summary.water);
+		document.getElementById('sum-elec').innerText = Math.round(summary.elec);
+		document.getElementById('sum-vent').innerText = Math.round(summary.vent);
+	}
+</script>
+
+
+</body>
+</html>
