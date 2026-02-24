@@ -86,7 +86,7 @@
     #status { 
         position: fixed; 
         bottom: 20px; 
-        left: 370px; 
+        left: 400px; 
         background: rgba(0,0,0,0.8); 
         color: #fff;
         padding: 8px 15px; 
@@ -111,6 +111,25 @@
             <option value="elec">Elektryka (Żółty)</option>
             <option value="vent">Wentylacja (Zielony)</option>
         </select>
+		<hr style="margin:8px 0; border-color:#555;">
+        <label>Pokaż warstwę</label>
+		<div style="display:flex; flex-direction:row; gap:4px; font-size:12px;">
+			<label style="display:flex; flex-direction:column; align-items:center; gap:6px; margin:0;">
+				Ściany <input type="checkbox" id="vis-wall" checked> 
+			</label>
+			<label style="display:flex; flex-direction:column; align-items:center; gap:6px; margin:0;">
+				Woda/Kan <input type="checkbox" id="vis-water" checked> 
+			</label>
+			<label style="display:flex; flex-direction:column; align-items:center; gap:6px; margin:0;">
+				Elektryka <input type="checkbox" id="vis-elec" checked> 
+			</label>
+			<label style="display:flex; flex-direction:column; align-items:center; gap:6px; margin:0;">
+				Wentylacja <input type="checkbox" id="vis-vent" checked> 
+			</label>
+			<label style="display:flex; flex-direction:column; align-items:center; gap:6px; margin:0;">
+				Obrazy <input type="checkbox" id="vis-images" checked> 
+			</label>
+		</div>
     </div>
 
     <div class="tool-group">
@@ -259,6 +278,13 @@
 
     let elements = [];
 	let historyStack = [];
+	let layerVisibility = {
+		wall: true,
+		water: true,
+		elec: true,
+		vent: true,
+		images: true
+	};
     let isDrawing = false;
     let startPoint = null;
     let mousePos = { x: 0, y: 0 };
@@ -341,6 +367,13 @@
     const btnSelectMode = document.getElementById('btnSelectMode');
     const editPanel = document.getElementById('editPanel');
 	
+	['wall','water','elec','vent','images'].forEach(layer => {
+		document.getElementById('vis-' + layer).addEventListener('change', (e) => {
+			layerVisibility[layer] = e.target.checked;
+			render();
+		});
+	});
+
 	function getDist(x1, y1, x2, y2) {
         return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
     }
@@ -427,6 +460,7 @@
     // Funkcja sprawdzająca czy kliknięto w linię (z tolerancją 5px)
     function findElementAt(x, y) {
         return elements.find(el => {
+			if (!layerVisibility[el.type]) return false;
             const L2 = Math.pow(el.x2 - el.x1, 2) + Math.pow(el.y2 - el.y1, 2);
             if (L2 === 0) {
 				// traktuj jako punkt
@@ -589,6 +623,10 @@
 
     // --- Zaktualizowana logika MouseDown ---
     canvas.addEventListener('mousedown', (e) => {
+		// Srodkowy przycisk nic nie rób
+		if (e.button === 1) {
+			return;
+		}
         // 1. Prawy przycisk myszy
 		if (e.button === 2) {
 			if (isDrawing) {
@@ -745,6 +783,7 @@
 	};
 	
 	function findImageAt(x, y) {
+		if (!layerVisibility.images) return null;
 		return images.find(im =>
 			x >= im.x &&
 			x <= im.x + im.width &&
@@ -978,6 +1017,7 @@
         ctx.stroke();
 
 		elements.forEach(el => {
+			if (!layerVisibility[el.type]) return;
             ctx.beginPath();
             ctx.moveTo(el.x1, el.y1);
             ctx.lineTo(el.x2, el.y2);
@@ -998,48 +1038,50 @@
         });
 		
 		// ✅ Rysowanie obrazów
-		images.forEach(im => {
+		if (layerVisibility.images) {
+			images.forEach(im => {
 
-			ctx.save();
+				ctx.save();
 
-			const cx = im.x + im.width / 2;
-			const cy = im.y + im.height / 2;
+				const cx = im.x + im.width / 2;
+				const cy = im.y + im.height / 2;
 
-			ctx.translate(cx, cy);
-			ctx.rotate(im.rotation);
-			ctx.scale(im.flipX, im.flipY);
+				ctx.translate(cx, cy);
+				ctx.rotate(im.rotation);
+				ctx.scale(im.flipX, im.flipY);
 
-			ctx.drawImage(
-				im.img,
-				-im.width / 2,
-				-im.height / 2,
-				im.width,
-				im.height
-			);
-
-			// ✅ Ramka zaznaczenia
-			if (im === selectedImage) {
-				ctx.strokeStyle = "#ff00ff";
-				ctx.lineWidth = 2 / scale;
-				ctx.strokeRect(
+				ctx.drawImage(
+					im.img,
 					-im.width / 2,
 					-im.height / 2,
 					im.width,
 					im.height
 				);
 
-				// ✅ Uchwyt resize (prawy dolny)
-				ctx.fillStyle = "#ff00ff";
-				ctx.fillRect(
-					(im.width / 2 - 6 / scale) * im.flipX, // Mnożymy przez flipX
-					(im.height / 2 - 6 / scale) * im.flipY, // Mnożymy przez flipY
-					(12 / scale) * im.flipX,                // Szerokość też musi reagować na kierunek
-					(12 / scale) * im.flipY                 // Wysokość też musi reagować na kierunek
-				);
-			}
+				// ✅ Ramka zaznaczenia
+				if (im === selectedImage) {
+					ctx.strokeStyle = "#ff00ff";
+					ctx.lineWidth = 2 / scale;
+					ctx.strokeRect(
+						-im.width / 2,
+						-im.height / 2,
+						im.width,
+						im.height
+					);
 
-			ctx.restore();
-		});
+					// ✅ Uchwyt resize (prawy dolny)
+					ctx.fillStyle = "#ff00ff";
+					ctx.fillRect(
+						(im.width / 2 - 6 / scale) * im.flipX, // Mnożymy przez flipX
+						(im.height / 2 - 6 / scale) * im.flipY, // Mnożymy przez flipY
+						(12 / scale) * im.flipX,                // Szerokość też musi reagować na kierunek
+						(12 / scale) * im.flipY                 // Wysokość też musi reagować na kierunek
+					);
+				}
+
+				ctx.restore();
+			});
+		}
 		
 		// ✅ Rysowanie miarki
 		if (measureMode && measureBasePoint && startPoint) {
