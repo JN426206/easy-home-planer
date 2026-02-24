@@ -326,11 +326,36 @@
 	}
 
 	function undoLastEdit() {
+		console.log(historyStack);
 		if (historyStack.length === 0) return;
 
 		const prevState = JSON.parse(historyStack.pop());
+		console.log(prevState);
 		elements = prevState.elements || [];
-		images = prevState.images || [];
+		images = [];
+
+		if (prevState.images) {
+			prevState.images.forEach(imData => {
+				const img = new Image();
+				// img.onload = () => render();
+				img.src = imData.base64;
+
+				images.push({
+					name: imData.name || "obraz",
+					base64: imData.base64,
+					img: img,                 // ✅ odtworzony HTMLImageElement
+					x: imData.x,
+					y: imData.y,
+					width: imData.width,
+					height: imData.height,
+					z1: imData.z1 ?? 0,
+					z2: imData.z2 ?? 0,
+					rotation: imData.rotation || 0,
+					flipX: imData.flipX || 1,
+					flipY: imData.flipY || 1
+				});
+			});
+		}
 
 		selectedElement = null;
 		selectedImage = null;
@@ -600,8 +625,8 @@
 				type: layer,
 				x1: startPoint.x, y1: startPoint.y,
 				x2: newX, y2: newY,
-				z1: parseFloat(document.getElementById('heightZ').value),
-				z2: parseFloat(document.getElementById('heightZ').value),
+				z1: 0,
+				z2: 0,
 				t: parseFloat(document.getElementById('thickness').value)
 			});
 			saveHistory();
@@ -659,7 +684,7 @@
 			const foundImage = findImageAt(pos.x, pos.y);
             const found = findElementAt(pos.x, pos.y);
 			if (foundImage) {
-
+				saveHistory();
 				const handle = getImageHandle(foundImage, pos.x, pos.y);
 
 				if (handle) {
@@ -695,6 +720,7 @@
 				return;
 			}
             else if (found) {
+				saveHistory();
                 selectedElement = found;
 				selectedImage = null;
                 editPanel.style.display = 'block';
@@ -733,6 +759,7 @@
             startPoint = { ...mousePos }; 
         } else {
 			const layer = document.getElementById('layerSelect').value;
+			saveHistory();
 			elements.push({
 				name: layer,
 				type: layer,
@@ -756,7 +783,7 @@
 	document.getElementById('imageInput').onchange = (e) => {
 		const file = e.target.files[0];
 		if (!file) return;
-
+		saveHistory();
 		const reader = new FileReader();
 		reader.onload = (ev) => {
 			const img = new Image();
@@ -769,12 +796,13 @@
 					y: mousePos.y,
 					width: img.width,
 					height: img.height,
-					z1: parseFloat(document.getElementById('heightZ').value) || 0,
-					z2: parseFloat(document.getElementById('heightZ').value) || 0,
+					z1: 0,
+					z2: 0,
 					rotation: 0,
 					flipX: 1,
 					flipY: 1
 				});
+				saveHistory();
 				render();
 			};
 			img.src = ev.target.result;
@@ -964,6 +992,13 @@
 	});
     // --- Dodanie MouseUp ---
     window.addEventListener('mouseup', () => {
+		if (isDraggingElement) {
+			saveHistory(); // ✅ zapis po zakończeniu przesuwania
+		}
+
+		if (isDraggingImage || isResizingImage || isRotatingImage) {
+			saveHistory(); // ✅ zapis po zmianie obrazu
+		}
         isDraggingElement = false; // <--- DODANO: zatrzymuje przesuwanie po puszczeniu myszki
 		measureMode = false;
 		measureBasePoint = null;
