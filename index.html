@@ -473,6 +473,15 @@
 
     // --- Obsługa klawiszy strzałek ---
     window.addEventListener('keydown', (e) => {
+		const active = document.activeElement;
+		if (
+			active.tagName === "INPUT" ||
+			active.tagName === "TEXTAREA" ||
+			active.isContentEditable
+		) {
+			return;
+		}
+
         if (selectedElement && !inputBuffer) { // Nie przesuwaj, gdy wpisujemy długość
             const step = e.shiftKey ? 10 : 1;
             let moved = false;
@@ -489,6 +498,7 @@
         }
 		// Skróty klawiszowe (S dla selekcji, Delete dla usuwania)
         if (e.key.toLowerCase() === 's') btnSelectMode.onclick();
+		if (e.key === 'Delete' && selectedElement) deleteSelected();
 		
         // Obsługa Shift i ESC (zostaje z poprzedniej wersji)
         if (e.key === 'Shift') isShiftPressed = true;
@@ -856,13 +866,14 @@
 	document.getElementById('imageInput').onchange = (e) => {
 		const file = e.target.files[0];
 		if (!file) return;
+		const fileNameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
 		saveHistory();
 		const reader = new FileReader();
 		reader.onload = (ev) => {
 			const img = new Image();
 			img.onload = () => {
 				images.push({
-					name: "obraz",
+					name: fileNameWithoutExt,
 					base64: ev.target.result,
 					img: img,
 					x: mousePos.x,
