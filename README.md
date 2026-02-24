@@ -197,4 +197,7 @@ Supports backward compatibility with older file formats.
 - Technical measurement estimation
 - Floor plan tracing over imported images
 
+# Preview
+<img src="example SS.png">
+
 # Created with Google Gemini and ChatGPT
