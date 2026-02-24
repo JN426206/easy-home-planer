@@ -397,7 +397,14 @@
     function findElementAt(x, y) {
         return elements.find(el => {
             const L2 = Math.pow(el.x2 - el.x1, 2) + Math.pow(el.y2 - el.y1, 2);
-            if (L2 === 0) return false;
+            if (L2 === 0) {
+				// traktuj jako punkt
+				const dist = Math.sqrt(
+					Math.pow(x - el.x1, 2) +
+					Math.pow(y - el.y1, 2)
+				);
+				return dist < (el.t / 2 + 5);
+			}
             const r = ((x - el.x1) * (el.x2 - el.x1) + (y - el.y1) * (el.y2 - el.y1)) / L2;
             if (r < 0 || r > 1) return false;
             const dist = Math.sqrt(
