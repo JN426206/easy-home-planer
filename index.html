@@ -127,6 +127,7 @@
         <button id="btnSave" style="background: #27ae60;">💾 Zapisz do pliku .json</button>
         <button id="btnLoad" style="background: #2980b9;">📂 Wczytaj projekt</button>
         <input type="file" id="fileInput" style="display:none" accept=".json">
+		<button id="btnUndo" style="background:#f39c12;">↩ COFNIJ</button>
         <button id="btnClear">Wyczyść Projekt</button>
     </div>
 	<div class="tool-group">
@@ -257,6 +258,7 @@
     const status = document.getElementById('status');
 
     let elements = [];
+	let historyStack = [];
     let isDrawing = false;
     let startPoint = null;
     let mousePos = { x: 0, y: 0 };
@@ -284,6 +286,33 @@
 	const editZ1 = document.getElementById('editZ1');
 	const editZ2 = document.getElementById('editZ2');
 	const editHeight = document.getElementById('editHeight');
+
+	function saveHistory() {
+		historyStack.push(JSON.stringify({
+			elements: elements,
+			images: images
+		}));
+		
+		// ograniczenie historii do 50 kroków (opcjonalnie)
+		if (historyStack.length > 50) {
+			historyStack.shift();
+		}
+	}
+
+	function undoLastEdit() {
+		if (historyStack.length === 0) return;
+
+		const prevState = JSON.parse(historyStack.pop());
+		elements = prevState.elements || [];
+		images = prevState.images || [];
+
+		selectedElement = null;
+		selectedImage = null;
+		editPanel.style.display = 'none';
+		imageEditPanel.style.display = 'none';
+
+		render();
+	}
 
 	function updateZ2FromHeight() {
 		const z1 = parseFloat(editZ1.value) || 0;
@@ -327,6 +356,8 @@
 		isDraggingElement = false;
         render();
     };
+
+	document.getElementById('btnUndo').onclick = undoLastEdit;
 	
 	let isDraggingElement = false;
     let dragStartPos = { x: 0, y: 0 };
@@ -427,7 +458,7 @@
 
 		const deg = parseFloat(document.getElementById('imgRot').value);
 		selectedImage.rotation = deg * Math.PI / 180;
-
+		saveHistory();
 		render();
 	};
 	document.getElementById('btnFlipX').onclick = () => {
@@ -539,6 +570,7 @@
 				z2: parseFloat(document.getElementById('heightZ').value),
 				t: parseFloat(document.getElementById('thickness').value)
 			});
+			saveHistory();
 
             // Przesuwamy punkt startowy na koniec nowej linii (ciągłość)
             startPoint = { x: newX, y: newY };
@@ -675,6 +707,7 @@
 				t: parseFloat(document.getElementById('thickness').value)
 			});
             startPoint = { ...mousePos }; 
+			saveHistory();
         }
         render();
     });
@@ -730,6 +763,7 @@
 			selectedImage = null;
 		}
 		editPanel.style.display = 'none';
+		saveHistory();
 		render();
 	}
 	
@@ -761,6 +795,7 @@
              document.getElementById('editX2').value = selectedElement.x2;
              document.getElementById('editY2').value = selectedElement.y2;
         }
+		saveHistory();
         render();
     };
 	
@@ -1050,7 +1085,15 @@
 
     // Blokada menu i obsługa plików (jak wcześniej)
     canvas.oncontextmenu = (e) => e.preventDefault();
-    document.getElementById('btnClear').onclick = () => { if(confirm("Wyczyścić?")) { images = []; elements = []; isDrawing = false; render(); } };
+    document.getElementById('btnClear').onclick = () => { 
+		if(confirm("Wyczyścić?")) { 
+			saveHistory();
+			images = []; 
+			elements = []; 
+			isDrawing = false; 
+			render(); 
+		} 
+	};
 	document.getElementById('btnSave').onclick = () => {
 		const data = {
 			elements: elements.map(el => ({
