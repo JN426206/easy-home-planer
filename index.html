@@ -140,6 +140,8 @@
 		<button id="btnSelectMode">Tryb: SELEKCJA (S)</button>
 		<div id="editPanel" style="display:none; margin-top:10px; border-top:1px solid #555; padding-top:10px;">
 			<p style="font-size:12px; color:#aaa;">Edytuj zaznaczony:</p>
+			<label>Nazwa elementu:</label>
+			<input type="text" id="editName">
 			
 			<div style="display:grid; grid-template-columns: 1fr 1fr; gap: 5px;">
 				<div>
@@ -185,6 +187,9 @@
 		</div>
 		<div id="imageEditPanel" style="display:none; margin-top:10px; border-top:1px solid #555; padding-top:10px;">
 			<p style="font-size:12px; color:#aaa;">Edytuj obraz:</p>
+
+			<label>Nazwa obrazu:</label>
+			<input type="text" id="imgName">
 
 			<label>X [cm]</label>
 			<input type="number" id="imgX">
@@ -412,6 +417,7 @@
 		selectedImage.height = parseFloat(document.getElementById('imgH').value);
 		selectedImage.z1 = parseFloat(document.getElementById('imgZ1').value) || 0;
 		selectedImage.z2 = parseFloat(document.getElementById('imgZ2').value) || 0;
+		selectedImage.name = document.getElementById('imgName').value;
 
 		const deg = parseFloat(document.getElementById('imgRot').value);
 		selectedImage.rotation = deg * Math.PI / 180;
@@ -517,8 +523,10 @@
             const newY = Math.round(startPoint.y + Math.sin(finalAngle) * length);
 
             // Dodajemy element
+			const layer = document.getElementById('layerSelect').value;
 			elements.push({
-				type: document.getElementById('layerSelect').value,
+				name: layer,
+				type: layer,
 				x1: startPoint.x, y1: startPoint.y,
 				x2: newX, y2: newY,
 				z1: parseFloat(document.getElementById('heightZ').value),
@@ -602,6 +610,7 @@
 				document.getElementById('imgZ1').value = foundImage.z1 ?? 0;
 				document.getElementById('imgZ2').value = foundImage.z2 ?? 0;
 				document.getElementById('imgRot').value = Math.round(foundImage.rotation * 180 / Math.PI);
+				document.getElementById('imgName').value = foundImage.name || "obraz";
 				selectedElement = null;
 				isDraggingImage = true;
 				imageDragOffset.x = pos.x - foundImage.x;
@@ -624,6 +633,7 @@
 				document.getElementById('editZ2').value = found.z2 ?? found.z ?? 0;
 				document.getElementById('editHeight').value = (found.z2 ?? 0) - (found.z1 ?? 0);
                 document.getElementById('editT').value = found.t;
+				document.getElementById('editName').value = found.name || found.type;
                 
                 const len = getDist(found.x1, found.y1, found.x2, found.y2);
                 document.getElementById('editLen').value = Math.round(len);
@@ -646,8 +656,10 @@
             isDrawing = true;
             startPoint = { ...mousePos }; 
         } else {
+			const layer = document.getElementById('layerSelect').value;
 			elements.push({
-				type: document.getElementById('layerSelect').value,
+				name: layer,
+				type: layer,
 				x1: startPoint.x,
 				y1: startPoint.y,
 				x2: mousePos.x,
@@ -673,6 +685,7 @@
 			const img = new Image();
 			img.onload = () => {
 				images.push({
+					name: "obraz",
 					base64: ev.target.result,
 					img: img,
 					x: mousePos.x,
@@ -726,6 +739,7 @@
 		selectedElement.z1 = parseFloat(editZ1.value) || 0;
 		selectedElement.z2 = parseFloat(document.getElementById('editZ2').value);
         selectedElement.t = parseFloat(document.getElementById('editT').value);
+		selectedElement.name = document.getElementById('editName').value;
 
 		const height = parseFloat(editHeight.value) || 0;
 		selectedElement.z2 = selectedElement.z1 + height;
@@ -1034,6 +1048,7 @@
 	document.getElementById('btnSave').onclick = () => {
 		const data = {
 			elements: elements.map(el => ({
+				name: el.name,
 				type: el.type,
 				x1: el.x1,
 				y1: el.y1,
@@ -1044,6 +1059,7 @@
 				t: el.t
 			})),
 			images: images.map(im => ({
+				name: im.name,
 				base64: im.base64,
 				x: im.x,
 				y: im.y,
@@ -1077,6 +1093,7 @@
 				images = [];
 			} else {
 				elements = (data.elements || []).map(el => ({
+					name: el.name || el.type,
 					type: el.type,
 					x1: el.x1,
 					y1: el.y1,
@@ -1093,6 +1110,7 @@
 						img.onload = () => render();
 						img.src = imData.base64;
 						images.push({
+							name: imData.name || "obraz",
 							base64: imData.base64,
 							img: img,
 							x: imData.x,
