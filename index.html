@@ -350,7 +350,6 @@
         }
 		// Skróty klawiszowe (S dla selekcji, Delete dla usuwania)
         if (e.key.toLowerCase() === 's') btnSelectMode.onclick();
-        if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElement) deleteSelected();
 		
         // Obsługa Shift i ESC (zostaje z poprzedniej wersji)
         if (e.key === 'Shift') isShiftPressed = true;
