@@ -239,6 +239,7 @@
 			</div>
 
 			<button id="btnImgUpdate" style="background:#27ae60;">ZASTOSUJ</button>
+			<button id="btnDeleteImg" style="background:#c0392b;">USUŃ (Del)</button>
 		</div>
 
 	</div>
@@ -879,6 +880,7 @@
 	}
 	
     document.getElementById('btnDelete').onclick = deleteSelected;
+    document.getElementById('btnDeleteImg').onclick = deleteSelected;
 
     // Logika przycisku ZASTOSUJ ZMIANY
     document.getElementById('btnUpdate').onclick = () => {
