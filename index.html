@@ -115,8 +115,6 @@
 
     <div class="tool-group">
         <h3>2. Parametry Obiektu</h3>
-        <label>Wysokość montażu (Z) [cm]:</label>
-        <input type="number" id="heightZ" value="0">
         <label>Grubość/Średnica [cm]:</label>
         <input type="number" id="thickness" value="10">
     </div>
@@ -165,9 +163,20 @@
 			<label style="color:#f1c40f;">Długość całkowita [cm]:</label>
 			<input type="number" id="editLen">
 
-			<label>Wysokość Z [cm]:</label>
-			<input type="number" id="editZ">
-			
+			<div style="display:grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+				<div>
+					<label>Z1 [cm]:</label>
+					<input type="number" id="editZ1">
+				</div>
+				<div>
+					<label>Z2 [cm]:</label>
+					<input type="number" id="editZ2" disabled>
+				</div>
+			</div>
+
+			<label style="color:#5dade2;">Wysokość elementu (ΔZ) [cm]:</label>
+			<input type="number" id="editHeight">
+
 			<label>Grubość [cm]:</label>
 			<input type="number" id="editT">
 
@@ -260,6 +269,20 @@
 	let inputBuffer = ""; // Bufor dla wpisywanej długości
     const inputOverlay = document.getElementById('input-overlay');
     const inputBufferDisplay = document.getElementById('input-buffer');
+	// ✅ Automatyczne liczenie Z2 na podstawie Z1 + wysokość
+	const editZ1 = document.getElementById('editZ1');
+	const editZ2 = document.getElementById('editZ2');
+	const editHeight = document.getElementById('editHeight');
+
+	function updateZ2FromHeight() {
+		const z1 = parseFloat(editZ1.value) || 0;
+		const h = parseFloat(editHeight.value) || 0;
+		editZ2.value = z1 + h;
+	}
+
+	// Gdy zmienia się Z1 lub wysokość → przelicz
+	editZ1.addEventListener('input', updateZ2FromHeight);
+	editHeight.addEventListener('input', updateZ2FromHeight);
 
     canvas.width = 5000; 
     canvas.height = 5000;
@@ -486,13 +509,14 @@
             const newY = Math.round(startPoint.y + Math.sin(finalAngle) * length);
 
             // Dodajemy element
-            elements.push({
-                type: document.getElementById('layerSelect').value,
-                x1: startPoint.x, y1: startPoint.y,
-                x2: newX, y2: newY,
-                z: parseFloat(document.getElementById('heightZ').value),
-                t: parseFloat(document.getElementById('thickness').value)
-            });
+			elements.push({
+				type: document.getElementById('layerSelect').value,
+				x1: startPoint.x, y1: startPoint.y,
+				x2: newX, y2: newY,
+				z1: parseFloat(document.getElementById('heightZ').value),
+				z2: parseFloat(document.getElementById('heightZ').value),
+				t: parseFloat(document.getElementById('thickness').value)
+			});
 
             // Przesuwamy punkt startowy na koniec nowej linii (ciągłość)
             startPoint = { x: newX, y: newY };
@@ -541,6 +565,7 @@
         // 2. Tryb SELEKCJI i PRZESUWANIA
         if (selectionMode) {
 			const foundImage = findImageAt(pos.x, pos.y);
+            const found = findElementAt(pos.x, pos.y);
 			if (foundImage) {
 
 				const handle = getImageHandle(foundImage, pos.x, pos.y);
@@ -560,6 +585,7 @@
 
 				selectedImage = foundImage;
 				imageEditPanel.style.display = 'block';
+                editPanel.style.display = 'none';
 
 				document.getElementById('imgX').value = foundImage.x;
 				document.getElementById('imgY').value = foundImage.y;
@@ -573,17 +599,20 @@
 				render();
 				return;
 			}
-            const found = findElementAt(pos.x, pos.y);
-            if (found) {
+            else if (found) {
                 selectedElement = found;
+				selectedImage = null;
                 editPanel.style.display = 'block';
+				imageEditPanel.style.display = 'none';
                 
                 // Wypełnianie pól koordynatami
                 document.getElementById('editX1').value = found.x1;
                 document.getElementById('editY1').value = found.y1;
                 document.getElementById('editX2').value = found.x2;
                 document.getElementById('editY2').value = found.y2;
-                document.getElementById('editZ').value = found.z;
+				document.getElementById('editZ1').value = found.z1 ?? found.z ?? 0;
+				document.getElementById('editZ2').value = found.z2 ?? found.z ?? 0;
+				document.getElementById('editHeight').value = (found.z2 ?? 0) - (found.z1 ?? 0);
                 document.getElementById('editT').value = found.t;
                 
                 const len = getDist(found.x1, found.y1, found.x2, found.y2);
@@ -596,6 +625,7 @@
                 selectedElement = null;
 				selectedImage = null;
                 editPanel.style.display = 'none';
+				imageEditPanel.style.display = 'none';
             }
             render();
             return; // <--- DODANO: To jest kluczowe! Kończy funkcję, aby NIE zaczęło rysować podczas edycji
@@ -606,15 +636,16 @@
             isDrawing = true;
             startPoint = { ...mousePos }; 
         } else {
-            elements.push({
-                type: document.getElementById('layerSelect').value,
-                x1: startPoint.x,
-                y1: startPoint.y,
-                x2: mousePos.x,
-                y2: mousePos.y,
-                z: parseFloat(document.getElementById('heightZ').value),
-                t: parseFloat(document.getElementById('thickness').value)
-            });
+			elements.push({
+				type: document.getElementById('layerSelect').value,
+				x1: startPoint.x,
+				y1: startPoint.y,
+				x2: mousePos.x,
+				y2: mousePos.y,
+				z1: 0,
+				z2: 0,
+				t: parseFloat(document.getElementById('thickness').value)
+			});
             startPoint = { ...mousePos }; 
         }
         render();
@@ -680,8 +711,12 @@
         selectedElement.y1 = parseInt(document.getElementById('editY1').value);
         selectedElement.x2 = parseInt(document.getElementById('editX2').value);
         selectedElement.y2 = parseInt(document.getElementById('editY2').value);
-        selectedElement.z = parseFloat(document.getElementById('editZ').value);
+		selectedElement.z1 = parseFloat(editZ1.value) || 0;
+		selectedElement.z2 = parseFloat(document.getElementById('editZ2').value);
         selectedElement.t = parseFloat(document.getElementById('editT').value);
+
+		const height = parseFloat(editHeight.value) || 0;
+		selectedElement.z2 = selectedElement.z1 + height;
         
         // Przeliczenie jeśli zmieniono długość ręcznie
         const newLen = parseFloat(document.getElementById('editLen').value);
@@ -707,7 +742,7 @@
             distStr = ` | Długość: ${(d/100).toFixed(2)} m (${Math.round(d)} cm)`;
         }
         
-        status.innerHTML = `<strong>${mode}</strong> | X: ${mousePos.x}, Y: ${mousePos.y} | Z: ${document.getElementById('heightZ').value} cm${distStr}`;
+        status.innerHTML = `<strong>${mode}</strong> | X: ${mousePos.x}, Y: ${mousePos.y} ${distStr}`;
     }
 
 	// --- Zaktualizowana logika MouseMove ---
@@ -874,6 +909,26 @@
         ctx.moveTo(0, mousePos.y); ctx.lineTo(canvas.width, mousePos.y);
         ctx.moveTo(mousePos.x, 0); ctx.lineTo(mousePos.x, canvas.height);
         ctx.stroke();
+
+		elements.forEach(el => {
+            ctx.beginPath();
+            ctx.moveTo(el.x1, el.y1);
+            ctx.lineTo(el.x2, el.y2);
+            ctx.lineWidth = el.t;
+            // Podświetlenie na czerwono jeśli zaznaczony
+            ctx.strokeStyle = (el === selectedElement) ? "#ff0000" : colors[el.type];
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            // Obramowanie dla zaznaczonego elementu
+            if (el === selectedElement) {
+                ctx.setLineDash([5, 5]);
+                ctx.lineWidth = el.t + 4;
+                ctx.strokeStyle = "rgba(255,0,0,0.3)";
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        });
 		
 		// ✅ Rysowanie obrazów
 		images.forEach(im => {
@@ -909,35 +964,15 @@
 				// ✅ Uchwyt resize (prawy dolny)
 				ctx.fillStyle = "#ff00ff";
 				ctx.fillRect(
-					im.width / 2 - 6 / scale,
-					im.height / 2 - 6 / scale,
-					12 / scale,
-					12 / scale
+					(im.width / 2 - 6 / scale) * im.flipX, // Mnożymy przez flipX
+					(im.height / 2 - 6 / scale) * im.flipY, // Mnożymy przez flipY
+					(12 / scale) * im.flipX,                // Szerokość też musi reagować na kierunek
+					(12 / scale) * im.flipY                 // Wysokość też musi reagować na kierunek
 				);
 			}
 
 			ctx.restore();
 		});
-
-		elements.forEach(el => {
-            ctx.beginPath();
-            ctx.moveTo(el.x1, el.y1);
-            ctx.lineTo(el.x2, el.y2);
-            ctx.lineWidth = el.t;
-            // Podświetlenie na czerwono jeśli zaznaczony
-            ctx.strokeStyle = (el === selectedElement) ? "#ff0000" : colors[el.type];
-            ctx.lineCap = 'round';
-            ctx.stroke();
-
-            // Obramowanie dla zaznaczonego elementu
-            if (el === selectedElement) {
-                ctx.setLineDash([5, 5]);
-                ctx.lineWidth = el.t + 4;
-                ctx.strokeStyle = "rgba(255,0,0,0.3)";
-                ctx.stroke();
-                ctx.setLineDash([]);
-            }
-        });
 		
 		// ✅ Rysowanie miarki
 		if (measureMode && measureBasePoint && startPoint) {
@@ -986,7 +1021,16 @@
     document.getElementById('btnClear').onclick = () => { if(confirm("Wyczyścić?")) { images = []; elements = []; isDrawing = false; render(); } };
 	document.getElementById('btnSave').onclick = () => {
 		const data = {
-			elements: elements,
+			elements: elements.map(el => ({
+				type: el.type,
+				x1: el.x1,
+				y1: el.y1,
+				z1: el.z1 ?? el.z ?? 0,
+				x2: el.x2,
+				y2: el.y2,
+				z2: el.z2 ?? el.z ?? 0,
+				t: el.t
+			})),
 			images: images.map(im => ({
 				base64: im.base64,
 				x: im.x,
@@ -1018,7 +1062,16 @@
 				elements = data;
 				images = [];
 			} else {
-				elements = data.elements || [];
+				elements = (data.elements || []).map(el => ({
+					type: el.type,
+					x1: el.x1,
+					y1: el.y1,
+					z1: el.z1 ?? el.z ?? 0,
+					x2: el.x2,
+					y2: el.y2,
+					z2: el.z2 ?? el.z ?? 0,
+					t: el.t
+				}));
 				images = [];
 				if (data.images) {
 					data.images.forEach(imData => {
@@ -1047,21 +1100,38 @@
 	// ✅ DODAJ: funkcja licząca zestawienie długości warstw
 	function updateSummary() {
 		const summary = {
-			wall: 0,
-			water: 0,
-			elec: 0,
-			vent: 0
+			wall: { xy: 0, z: 0, total3D: 0 },
+			water: { xy: 0, z: 0, total3D: 0 },
+			elec: { xy: 0, z: 0, total3D: 0 },
+			vent: { xy: 0, z: 0, total3D: 0 }
 		};
 
 		elements.forEach(el => {
-			const len = getDist(el.x1, el.y1, el.x2, el.y2);
-			summary[el.type] += len;
+
+			const dx = el.x2 - el.x1;
+			const dy = el.y2 - el.y1;
+			const dz = (el.z2 ?? el.z ?? 0) - (el.z1 ?? el.z ?? 0);
+
+			const lenXY = Math.sqrt(dx*dx + dy*dy);
+			const lenZ = Math.abs(dz);
+			const len3D = Math.sqrt(dx*dx + dy*dy + dz*dz);
+
+			summary[el.type].xy += lenXY;
+			summary[el.type].z += lenZ;
+			summary[el.type].total3D += len3D;
 		});
 
-		document.getElementById('sum-wall').innerText = Math.round(summary.wall);
-		document.getElementById('sum-water').innerText = Math.round(summary.water);
-		document.getElementById('sum-elec').innerText = Math.round(summary.elec);
-		document.getElementById('sum-vent').innerText = Math.round(summary.vent);
+		document.getElementById('sum-wall').innerText =
+			`${Math.round(summary.wall.xy)} cm | Z: ${Math.round(summary.wall.z)} cm`;
+
+		document.getElementById('sum-water').innerText =
+			`${Math.round(summary.water.xy)} cm | Z: ${Math.round(summary.water.z)} cm`;
+
+		document.getElementById('sum-elec').innerText =
+			`${Math.round(summary.elec.xy)} cm | Z: ${Math.round(summary.elec.z)} cm`;
+
+		document.getElementById('sum-vent').innerText =
+			`${Math.round(summary.vent.xy)} cm | Z: ${Math.round(summary.vent.z)} cm`;
 	}
 </script>
 
