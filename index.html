@@ -141,6 +141,7 @@
     <div class="tool-group">
         <h3>3. Akcje i Pliki</h3>
         <button id="btnLine" class="active">Rysuj Linię (Klik -> Klik)</button>
+        <button id="btnDuplicate" style="background:#D0F0C0;color:#333333">👯Duplikuj element</button>
 		<button id="btnAddImage" style="background:#8e44ad;">🖼️ Dodaj obraz</button>
 		<input type="file" id="imageInput" accept="image/*" style="display:none">
         <button id="btnSave" style="background: #27ae60;">💾 Zapisz do pliku .json</button>
@@ -414,6 +415,49 @@
 		isDraggingElement = false;
         render();
     };
+
+	document.getElementById('btnDuplicate').onclick = duplicateSelected;
+	function duplicateSelected() {
+		// ✅ Duplikowanie elementu
+		if (selectedElement) {
+			saveHistory();
+
+			const offset = 20; // przesunięcie kopii
+
+			const copy = {
+				...selectedElement,
+				x1: selectedElement.x1 + offset,
+				y1: selectedElement.y1 + offset,
+				x2: selectedElement.x2 + offset,
+				y2: selectedElement.y2 + offset
+			};
+
+			elements.push(copy);
+			selectedElement = copy;
+			render();
+		}
+
+		// ✅ Duplikowanie obrazu
+		else if (selectedImage) {
+			saveHistory();
+
+			const offset = 20;
+
+			const img = new Image();
+			img.src = selectedImage.base64;
+
+			const copy = {
+				...selectedImage,
+				img: img,
+				x: selectedImage.x + offset,
+				y: selectedImage.y + offset
+			};
+
+			images.push(copy);
+			selectedImage = copy;
+			render();
+		}
+	}
 
 	document.getElementById('btnUndo').onclick = undoLastEdit;
 	
