@@ -192,6 +192,12 @@
 			<label>Y [cm]</label>
 			<input type="number" id="imgY">
 
+			<label>Z1 [cm]</label>
+			<input type="number" id="imgZ1">
+
+			<label>Z2 [cm]</label>
+			<input type="number" id="imgZ2">
+
 			<label>Szerokość [cm]</label>
 			<input type="number" id="imgW">
 
@@ -404,6 +410,8 @@
 		selectedImage.y = parseFloat(document.getElementById('imgY').value);
 		selectedImage.width = parseFloat(document.getElementById('imgW').value);
 		selectedImage.height = parseFloat(document.getElementById('imgH').value);
+		selectedImage.z1 = parseFloat(document.getElementById('imgZ1').value) || 0;
+		selectedImage.z2 = parseFloat(document.getElementById('imgZ2').value) || 0;
 
 		const deg = parseFloat(document.getElementById('imgRot').value);
 		selectedImage.rotation = deg * Math.PI / 180;
@@ -591,6 +599,8 @@
 				document.getElementById('imgY').value = foundImage.y;
 				document.getElementById('imgW').value = Math.round(foundImage.width);
 				document.getElementById('imgH').value = Math.round(foundImage.height);
+				document.getElementById('imgZ1').value = foundImage.z1 ?? 0;
+				document.getElementById('imgZ2').value = foundImage.z2 ?? 0;
 				document.getElementById('imgRot').value = Math.round(foundImage.rotation * 180 / Math.PI);
 				selectedElement = null;
 				isDraggingImage = true;
@@ -669,6 +679,8 @@
 					y: mousePos.y,
 					width: img.width,
 					height: img.height,
+					z1: parseFloat(document.getElementById('heightZ').value) || 0,
+					z2: parseFloat(document.getElementById('heightZ').value) || 0,
 					rotation: 0,
 					flipX: 1,
 					flipY: 1
@@ -1037,6 +1049,8 @@
 				y: im.y,
 				width: im.width,
 				height: im.height,
+				z1: im.z1 ?? 0,
+				z2: im.z2 ?? 0,
 				rotation: im.rotation,
 				flipX: im.flipX,
 				flipY: im.flipY
@@ -1085,6 +1099,8 @@
 							y: imData.y,
 							width: imData.width,
 							height: imData.height,
+							z1: imData.z1 ?? 0,
+							z2: imData.z2 ?? 0,
 							rotation: imData.rotation || 0,
 							flipX: imData.flipX || 1,
 							flipY: imData.flipY || 1
