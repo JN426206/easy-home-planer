@@ -226,10 +226,12 @@
 
 			<label>Szerokość [cm]</label>
 			<input type="number" id="imgW">
-
+			<label style="display:flex; align-items:center; gap:6px; font-size:12px;">
+				<input type="checkbox" id="imgKeepRatio" checked>
+				Zachowaj proporcje
+			</label>
 			<label>Wysokość [cm]</label>
 			<input type="number" id="imgH">
-
 			<label>Obrót [°]</label>
 			<input type="number" id="imgRot">
 
@@ -314,6 +316,9 @@
 	const editZ1 = document.getElementById('editZ1');
 	const editZ2 = document.getElementById('editZ2');
 	const editHeight = document.getElementById('editHeight');
+	const imgKeepRatio = document.getElementById('imgKeepRatio');
+	const imgWInput = document.getElementById('imgW');
+	const imgHInput = document.getElementById('imgH');
 
 	function saveHistory() {
 		historyStack.push(JSON.stringify({
@@ -549,6 +554,29 @@
             return dist < (el.t / 2 + 5);
         });
     }
+
+	// ✅ Zachowanie proporcji przy zmianie szerokości
+	imgWInput.addEventListener('input', () => {
+		if (!selectedImage || !imgKeepRatio.checked) return;
+
+		const ratio = selectedImage.img.width / selectedImage.img.height;
+		const newW = parseFloat(imgWInput.value);
+		if (!isNaN(newW)) {
+			imgHInput.value = Math.round(newW / ratio);
+		}
+	});
+
+	// ✅ Zachowanie proporcji przy zmianie wysokości
+	imgHInput.addEventListener('input', () => {
+		if (!selectedImage || !imgKeepRatio.checked) return;
+
+		const ratio = selectedImage.img.width / selectedImage.img.height;
+		const newH = parseFloat(imgHInput.value);
+		if (!isNaN(newH)) {
+			imgWInput.value = Math.round(newH * ratio);
+		}
+	});
+
 	document.getElementById('btnImgUpdate').onclick = () => {
 		if (!selectedImage) return;
 
