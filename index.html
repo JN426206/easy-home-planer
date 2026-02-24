@@ -507,7 +507,8 @@
             inputOverlay.style.display = 'none'; render(); return;
         }
 		// ✅ ZMIANA orientacji miarki klawiszem R
-		if (measureMode && e.key.toLowerCase() === 'q') {		
+		if (measureMode && e.key.toLowerCase() === 'q') {	
+			e.preventDefault();	
 			measureOrientation = (measureOrientation === "perp") ? "parallel" : "perp";
 		}
 		if (selectedImage && e.key.toLowerCase() === 'x') {
@@ -838,9 +839,9 @@
 
         // 3. Tryb RYSOWANIA (wykona się tylko jeśli selectionMode == false) <--- ZMIANA: logika rysowania oddzielona
         if (!isDrawing || measureMode) {
-            isDrawing = true;
-            startPoint = { ...mousePos }; 
-        } else {
+			isDrawing = true;
+			startPoint = { ...pos };   // ✅ używamy aktualnej pozycji kliknięcia
+		} else {
 			const layer = document.getElementById('layerSelect').value;
 			saveHistory();
 			elements.push({
